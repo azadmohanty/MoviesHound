@@ -1,71 +1,125 @@
 import streamlit as st
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
+import concurrent.futures
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="Movie Searcher", page_icon="🎬")
-st.title("🎬 Multi-Site Movie Search")
-st.markdown("Searching: `moviesmod.town` and `moviesleech.zip`")
+st.set_page_config(page_title="Ultimate Movie Search", page_icon="🚀", layout="wide")
+st.title("🚀 Universal Turbo Search")
+
+# 1. PERSISTENT SESSION
+if 'scraper' not in st.session_state:
+    st.session_state.scraper = cloudscraper.create_scraper(
+        browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+    )
+
+DEFAULT_SITES = {
+    "https://moviesmod.town/": "MoviesMod",
+    "https://moviesleech.zip/": "MoviesLeech",
+    "https://rogmovies.world/": "RogMovies",
+    "https://new3.hdhub4u.fo/": "HDHub4u",
+    "https://vegamovies.gratis/": "VegaMovies"
+}
 
 # --- FUNCTIONS ---
-def get_search_results(keyword, site_url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-    }
-    search_url = f"{site_url}?s={keyword.replace(' ', '+')}"
-    
+
+def sync_from_hubs():
+    found_sites = DEFAULT_SITES.copy()
+    hubs = ["https://vglist.cv/", "https://www.modlist.in/"]
+    for hub in hubs:
+        try:
+            response = st.session_state.scraper.get(hub, timeout=8)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                for a in soup.find_all('a', href=True):
+                    url = a['href'].lower()
+                    if any(ext in url for ext in ['.town', '.zip', '.dad', '.loan', '.world', '.fo', '.gratis']):
+                        if 't.me' not in url and 'facebook' not in url:
+                            if not url.endswith('/'): url += '/'
+                            name = url.split('//')[-1].split('.')[0].upper()
+                            found_sites[url] = name
+        except:
+            continue
+    return found_sites
+
+def fetch_site_data(keyword, site_url, site_name):
+    """
+    PURE DATA FUNCTION: 
+    No 'st.' commands here. This prevents the ScriptRunContext error.
+    """
+    search_url = f"{site_url.rstrip('/')}/?s={keyword.replace(' ', '+')}"
+    results = []
     try:
-        response = requests.get(search_url, headers=headers, timeout=10)
+        # We use a fresh scraper instance inside threads for maximum safety
+        # or use the session one carefully.
+        scraper = cloudscraper.create_scraper() 
+        response = scraper.get(search_url, timeout=7)
+        
         if response.status_code != 200:
             return []
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        results = []
 
-        # These sites typically use <h2> or <a> tags for their movie titles in search results
-        for item in soup.find_all(['h2', 'h3']):
-            link_tag = item.find('a')
-            if link_tag and link_tag.get('href'):
-                title = link_tag.get_text().strip()
-                link = link_tag.get('href')
-                
-                # STRICT FILTERING: Only show if keyword is in the title
-                if keyword.lower() in title.lower():
-                    results.append({"title": title, "link": link})
-        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        for link_tag in soup.find_all('a', href=True):
+            title = link_tag.get_text().strip()
+            link = link_tag.get('href')
+            
+            if len(title) > 3 and keyword.lower() in title.lower():
+                if link.startswith('http') and "/?s=" not in link:
+                    if not any(r['link'] == link for r in results):
+                        results.append({"title": title, "link": link, "site": site_name})
         return results
-    except Exception as e:
-        st.error(f"Error searching {site_url}: {e}")
+    except:
         return []
 
-# --- USER INTERFACE ---
-query = st.text_input("Enter Movie or Keyword:", placeholder="e.g. Pluribus")
+# --- SIDEBAR ---
+with st.sidebar:
+    st.header("⚙️ System Status")
+    # Using st.cache_data here is fine because it's in the main thread
+    @st.cache_data(ttl=3600)
+    def cached_sync():
+        return sync_from_hubs()
+        
+    current_active_sites = cached_sync()
+    st.success(f"Synced {len(current_active_sites)} sites")
+    
+    st.markdown("---")
+    st.subheader("🛠️ Manual Overrides")
+    final_search_list = {}
+    for url, name in current_active_sites.items():
+        user_url = st.text_input(f"URL: {name}", value=url, key=url)
+        final_search_list[user_url] = name
+
+# --- MAIN UI ---
+query = st.text_input("Enter Movie Name:", placeholder="e.g. Batman")
 
 if query:
-    sites = [
-        "https://moviesmod.town/",
-        "https://moviesleech.zip/",
-        "https://rogmovies.world/",
-        "https://new3.hdhub4u.fo/",
-        "https://vegamovies.gratis/"
-    ]
+    status_text = st.empty()
+    results_container = st.container()
+    found_any = False
     
-    all_results = []
-    
-    with st.spinner(f"Searching for '{query}'..."):
-        for site in sites:
-            res = get_search_results(query, site)
-            for r in res:
-                r['site'] = site.split('//')[1].split('/')[0] # Clean site name for display
-                all_results.append(r)
-
-    if all_results:
-        st.success(f"Found {len(all_results)} matches in titles!")
-        for item in all_results:
-            with st.container():
-                st.markdown(f"### [{item['site']}] {item['title']}")
-                st.markdown(f"[View Movie Page]({item['link']})")
-                st.divider()
-    else:
-        st.warning("No exact title matches found. Try a different keyword.")
+    # 2. THE THREADING BLOCK
+    # We do NOT pass Streamlit commands into the threads.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(final_search_list)) as executor:
+        status_text.info(f"🔍 Searching {len(final_search_list)} sites in parallel...")
         
+        # Submit the tasks
+        future_to_url = {
+            executor.submit(fetch_site_data, query, url, name): name 
+            for url, name in final_search_list.items()
+        }
+
+        # 3. THE UI RENDERING (Done only in the Main Thread)
+        for future in concurrent.futures.as_completed(future_to_url):
+            site_results = future.result() # Get data from thread
+            if site_results:
+                found_any = True
+                with results_container:
+                    # All 'st.' calls happen here, safely in the main thread.
+                    for item in site_results:
+                        st.markdown(f"### [{item['site']}] {item['title']}")
+                        st.markdown(f"🔗 [View Movie Page]({item['link']})")
+                        st.divider()
+    
+    status_text.empty()
+    if not found_any:
+        st.warning("No matches found. Check your keyword or update URLs in the sidebar.")
