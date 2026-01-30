@@ -3,7 +3,8 @@
   --card-bg: #161616;
   --text-primary: #ededed;
   --text-secondary: #a0a0a0;
-  --accent-color: #3b82f6; /* Premium Blue */
+  --accent-color: #3b82f6;
+  /* Premium Blue */
   --accent-hover: #2563eb;
   --border-color: #333;
   --success-color: #10b981;
@@ -35,6 +36,7 @@ h1 {
   margin-bottom: 0.5rem;
   background: linear-gradient(to right, #fff, #a0a0a0);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -156,9 +158,17 @@ h1 {
 }
 
 @keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Info Section Styling */

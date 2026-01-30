@@ -9,6 +9,8 @@ const DEFAULT_SITES: Record<string, string> = {
     "https://rogmovies.world/": "RogMovies",
     "https://new3.hdhub4u.fo/": "HDHub4u",
     "https://vegamovies.gratis/": "VegaMovies",
+    "https://vegamovies.kg/": "VegaMovies",
+    "https://bolly4u.fyi/": "Bolly4u"
 };
 
 type SearchResult = {
@@ -29,6 +31,9 @@ export default function Home() {
     const [sites, setSites] = useState(DEFAULT_SITES);
     const [statuses, setStatuses] = useState<Record<string, SiteStatus>>({});
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // TRACKING: Prevent race conditions from old searches
+    const searchId = React.useRef(0);
 
     // Load synced sites on mount
     useEffect(() => {
@@ -62,6 +67,10 @@ export default function Home() {
         e.preventDefault();
         if (!query.trim()) return;
 
+        // 1. Increment ID: This invalidates all previous pending requests
+        const currentId = searchId.current + 1;
+        searchId.current = currentId;
+
         setResults([]); // Clear previous
         const newStatuses: Record<string, SiteStatus> = {};
 
@@ -80,6 +89,9 @@ export default function Home() {
             fetch(`/api/search?q=${encodeURIComponent(query)}&url=${encodeURIComponent(siteUrl)}&name=${encodeURIComponent(siteName)}`)
                 .then((res) => res.json())
                 .then((data: { results?: SearchResult[] }) => {
+                    // CHECK: Is this still the active search?
+                    if (searchId.current !== currentId) return;
+
                     if (data.results) {
                         setResults((prev) => [...prev, ...data.results!]);
                         setStatuses((prev) => ({
@@ -94,6 +106,7 @@ export default function Home() {
                     }
                 })
                 .catch(() => {
+                    if (searchId.current !== currentId) return;
                     setStatuses((prev) => ({
                         ...prev,
                         [siteUrl]: { ...prev[siteUrl], status: "error", count: 0 },

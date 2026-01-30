@@ -1,0 +1,17 @@
+{
+    "name": "MoviesHound",
+    "short_name": "MoviesHound",
+    "description": "Search Once. Watch Anywhere.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0a",
+    "theme_color": "#3b82f6",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/icon.png",
+            "sizes": "1024x1024",
+            "type": "image/png"
+        }
+    ]
+}

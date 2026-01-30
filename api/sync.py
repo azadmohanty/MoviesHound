@@ -103,7 +103,8 @@ class handler(BaseHTTPRequestHandler):
                             # Heuristic Name Extraction
                             # e.g. https://moviesmod.town/ -> MOVIESMOD
                             try:
-                                clean_name = url.split('//')[-1].split('.')[0].upper()
+                                clean_url = url.replace('www.', '')
+                                clean_name = clean_url.split('//')[-1].split('.')[0].upper()
                                 # Avoid short garbage names and ensure it looks like a domain
                                 if len(clean_name) > 3 and '.' in url:
                                     found_sites[url] = clean_name

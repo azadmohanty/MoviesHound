@@ -1,8 +1,10 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import json
+import os
 import cloudscraper
 from bs4 import BeautifulSoup
+import redis
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -17,6 +19,30 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": "Missing params"}).encode())
             return
 
+        # --- 1. CACHE CHECK (Redis) ---
+        # We generate a unique key based on the site and query
+        cache_key = f"search:{site_name}:{keyword.lower().strip()}"
+        redis_client = None
+        
+        try:
+            # Support both Vercel KV and standard Upstash integration
+            redis_url = os.environ.get("KV_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
+            
+            if redis_url:
+                redis_client = redis.from_url(redis_url)
+                cached_data = redis_client.get(cache_key)
+                if cached_data:
+                    # HIT! Return instantly
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('X-Cache', 'HIT')
+                    self.end_headers()
+                    self.wfile.write(cached_data)
+                    return
+        except Exception as e:
+            print(f"Redis Error: {e}")
+
+        # --- 2. SCRAPE (Miss) ---
         results = []
         try:
             scraper = cloudscraper.create_scraper()
@@ -41,7 +67,17 @@ class handler(BaseHTTPRequestHandler):
             print(f"Error scraping {site_name}: {e}")
             pass
 
+        response_json = json.dumps({"results": results})
+
+        # --- 3. CACHE SET ---
+        # Save for 24 hours (86400 seconds) if we found active results or empty list (to prevent spam)
+        try:
+            if redis_client:
+                redis_client.set(cache_key, response_json, ex=86400)
+        except: pass
+
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
+        self.send_header('X-Cache', 'MISS')
         self.end_headers()
-        self.wfile.write(json.dumps({"results": results}).encode())
+        self.wfile.write(response_json.encode())
