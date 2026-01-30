@@ -20,27 +20,33 @@ class handler(BaseHTTPRequestHandler):
             return
 
         # --- 1. CACHE CHECK (Redis) ---
-        # We generate a unique key based on the site and query
         cache_key = f"search:{site_name}:{keyword.lower().strip()}"
         redis_client = None
+        redis_status = "Not Initialized"
         
         try:
-            # Support both Vercel KV and standard Upstash integration
             redis_url = os.environ.get("KV_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
             
             if redis_url:
                 redis_client = redis.from_url(redis_url)
+                # Build connection to verify
+                redis_client.ping() 
+                redis_status = "Connected"
+                
                 cached_data = redis_client.get(cache_key)
                 if cached_data:
-                    # HIT! Return instantly
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
                     self.send_header('X-Cache', 'HIT')
+                    self.send_header('X-Redis-Status', 'Connected')
                     self.end_headers()
                     self.wfile.write(cached_data)
                     return
+            else:
+                redis_status = "Missing URL Env Var"
         except Exception as e:
             print(f"Redis Error: {e}")
+            redis_status = f"Error: {str(e)}"
 
         # --- 2. SCRAPE (Miss) ---
         results = []
@@ -79,5 +85,6 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('X-Cache', 'MISS')
+        self.send_header('X-Redis-Status', redis_status)
         self.end_headers()
         self.wfile.write(response_json.encode())

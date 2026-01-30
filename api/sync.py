@@ -87,6 +87,10 @@ class handler(BaseHTTPRequestHandler):
         # STRATEGY 2: SCRAPE HUBS
         for hub in HUB_SOURCES:
             try:
+                # Extract the hub's own domain to avoid self-referencing links
+                # e.g. "https://modlist.in/" -> "modlist.in"
+                hub_domain = hub.split('//')[-1].split('/')[0].replace('www.', '')
+
                 response = scraper.get(hub, timeout=5)
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -95,6 +99,9 @@ class handler(BaseHTTPRequestHandler):
                         
                         # Basic validity check
                         if not url.startswith('http'): continue
+
+                        # FILTER: Don't add the hub's own internal links
+                        if hub_domain in url: continue
                         
                         # Apply Blacklist Logic (Permissive Mode)
                         if not any(bad in url for bad in IGNORED_DOMAINS):
