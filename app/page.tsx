@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 // Initial fallback sites
 const DEFAULT_SITES: Record<string, string> = {
@@ -36,7 +36,7 @@ export default function Home() {
         if (saved) {
             try {
                 setSites(JSON.parse(saved));
-            } catch (e) {
+            } catch (e: unknown) {
                 console.error("Failed to parse saved sites", e);
             }
         }
@@ -51,7 +51,7 @@ export default function Home() {
             setSites(data.sites);
             localStorage.setItem("movie_sites", JSON.stringify(data.sites));
             alert(`Synced! Found ${Object.keys(data.sites).length} active sites.`);
-        } catch (e) {
+        } catch (e: unknown) {
             alert("Failed to sync sites. Using offline defaults.");
         } finally {
             setIsSyncing(false);
@@ -73,26 +73,30 @@ export default function Home() {
 
         // FAN-OUT: Trigger all fetches in parallel
         Object.entries(sites).forEach(([url, name]) => {
-            fetch(`/api/search?q=${encodeURIComponent(query)}&url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`)
+            // Explicitly cast to prevent 'unknown' errors if strict mode complains
+            const siteUrl = url as string;
+            const siteName = name as string;
+
+            fetch(`/api/search?q=${encodeURIComponent(query)}&url=${encodeURIComponent(siteUrl)}&name=${encodeURIComponent(siteName)}`)
                 .then((res) => res.json())
-                .then((data) => {
+                .then((data: { results?: SearchResult[] }) => {
                     if (data.results) {
-                        setResults((prev) => [...prev, ...data.results]);
+                        setResults((prev) => [...prev, ...data.results!]);
                         setStatuses((prev) => ({
                             ...prev,
-                            [url]: { ...prev[url], status: "success", count: data.results.length },
+                            [siteUrl]: { ...prev[siteUrl], status: "success", count: data.results!.length },
                         }));
                     } else {
                         setStatuses((prev) => ({
                             ...prev,
-                            [url]: { ...prev[url], status: "error", count: 0 },
+                            [siteUrl]: { ...prev[siteUrl], status: "error", count: 0 },
                         }));
                     }
                 })
                 .catch(() => {
                     setStatuses((prev) => ({
                         ...prev,
-                        [url]: { ...prev[url], status: "error", count: 0 },
+                        [siteUrl]: { ...prev[siteUrl], status: "error", count: 0 },
                     }));
                 });
         });
@@ -107,6 +111,7 @@ export default function Home() {
             </div>
 
             <h1>MoviesHound</h1>
+            <p className="subtitle">Search Once. Watch Anywhere.</p>
 
             <form onSubmit={handleSearch}>
                 <input
@@ -142,6 +147,25 @@ export default function Home() {
                         <span>↗</span>
                     </a>
                 ))}
+            </div>
+
+            {/* Help / Info Section */}
+            <div className="info-card">
+                <h3>How it works</h3>
+                <div className="info-grid">
+                    <div className="info-item">
+                        <h4>🔍 Search</h4>
+                        <p>Enter a movie or series Name. We scan multiple sites in parallel for you.</p>
+                    </div>
+                    <div className="info-item">
+                        <h4>⚡ Instant Links</h4>
+                        <p>Click any result to go directly to the download page. No middlemen.</p>
+                    </div>
+                    <div className="info-item">
+                        <h4>🛠️ Auto-Sync</h4>
+                        <p>Links broken? Click <b>Refresh Sites</b> to automatically find new working URLs.</p>
+                    </div>
+                </div>
             </div>
         </main>
     );
