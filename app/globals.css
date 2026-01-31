@@ -65,147 +65,88 @@ h1 {
   border-color: var(--accent-color);
 }
 
+/* Result Card Container */
 .results-grid {
   display: grid;
   gap: 1rem;
 }
 
+.result-card-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
 .result-card {
+  flex: 1;
+  /* Main card takes mostly all space */
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   padding: 1rem;
-  border-radius: 8px;
-  transition: transform 0.2s, border-color 0.2s;
+  border-radius: 12px;
+  /* Softer corners */
+  transition: transform 0.2s, border-color 0.2s, background-color 0.2s;
   text-decoration: none;
   color: inherit;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
+  /* Space between text and arrow */
+}
+
+.result-card:active {
+  transform: scale(0.98);
+  /* Touch feedback */
 }
 
 .result-card:hover {
   transform: translateY(-2px);
   border-color: var(--accent-color);
+  background: #1a1a1a;
 }
 
-.site-badge {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-secondary);
+.result-card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.3rem;
+  line-height: 1.3;
+}
+
+.arrow {
+  color: var(--accent-color);
+  font-size: 1.2rem;
+  font-weight: bold;
+  opacity: 0.7;
+}
+
+.result-card:hover .arrow {
+  opacity: 1;
+  transform: translateX(2px);
+  transition: transform 0.2s;
+}
+
+/* Proxy Unlock Button */
+.proxy-btn {
   background: #262626;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
-}
-
-.btn {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-.btn:hover {
-  border-color: var(--accent-color);
-  color: #fff;
-}
-
-.status-bar {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.status-indicator {
-  font-size: 0.8rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 20px;
-  background: #262626;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.status-indicator.loading .dot {
-  background-color: #fbbf24;
-  animation: pulse 1s infinite;
-}
-
-.status-indicator.success .dot {
-  background-color: var(--success-color);
-}
-
-.status-indicator.error .dot {
-  background-color: #ef4444;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #666;
-}
-
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.5;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-/* Info Section Styling */
-.info-card {
-  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 1.5rem;
-  margin-top: 4rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.info-card h3 {
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  font-size: 1rem;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-}
-
-.info-item h4 {
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.95rem;
+  justify-content: center;
+  padding: 0 1.2rem;
+  font-size: 1.2rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 60px;
+  /* Touch target */
 }
 
-.info-item p {
-  line-height: 1.4;
-  font-size: 0.85rem;
+.proxy-btn:hover {
+  background: var(--success-color);
+  border-color: var(--success-color);
+  transform: translateY(-2px);
+  color: #fff;
 }
 
 /* Category Filter Styles */
@@ -221,11 +162,12 @@ h1 {
   background: var(--card-bg);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
-  padding: 0.5rem 1.2rem;
-  border-radius: 20px;
+  padding: 0.6rem 1.4rem;
+  border-radius: 100px;
   cursor: pointer;
   font-size: 0.95rem;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .filter-pill:hover {
@@ -237,5 +179,61 @@ h1 {
   background: var(--accent-color);
   border-color: var(--accent-color);
   color: #fff;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* MOBILE RESPONSIVENESS */
+@media (max-width: 640px) {
+  main {
+    padding: 1.5rem 1rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  .subtitle {
+    margin-bottom: 2rem;
+    font-size: 1rem;
+  }
+
+  .search-box {
+    font-size: 1rem;
+    padding: 0.9rem;
+  }
+
+  /* Make categories scrollable horizontally on very small screens if needed, 
+     but wrapping is usually better for accessibility. 
+     Lets tighten the gap. */
+  .category-filter {
+    gap: 0.5rem;
+  }
+
+  .filter-pill {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .result-card {
+    padding: 0.9rem;
+  }
+
+  .result-card h3 {
+    font-size: 0.9rem;
+  }
+
+  .site-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .proxy-btn {
+    padding: 0 1rem;
+    min-width: 50px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    /* Stack info cards */
+  }
 }

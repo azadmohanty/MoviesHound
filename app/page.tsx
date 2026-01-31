@@ -8,7 +8,6 @@ const DEFAULT_SITES: Record<string, string> = {
     "https://moviesleech.zip/": "MoviesLeech",
     "https://rogmovies.world/": "RogMovies",
     "https://new3.hdhub4u.fo/": "HDHub4u",
-    "https://vegamovies.gratis/": "VegaMovies",
     "https://vegamovies.kg/": "VegaMovies",
     "https://bolly4u.fyi/": "Bolly4u"
 };
@@ -199,13 +198,26 @@ export default function Home() {
 
             <div className="results-grid">
                 {results.map((r, i) => (
-                    <a key={i} href={r.link} target="_blank" rel="noopener noreferrer" className="result-card">
-                        <div>
-                            <h3>{r.title}</h3>
-                            <span className="site-badge">{r.site}</span>
-                        </div>
-                        <span>↗</span>
-                    </a>
+                    <div key={i} className="result-card-container">
+                        <a href={r.link} target="_blank" rel="noopener noreferrer" className="result-card">
+                            <div>
+                                <h3>{r.title}</h3>
+                                <span className="site-badge">{r.site}</span>
+                            </div>
+                            <span className="arrow">↗</span>
+                        </a>
+
+                        {/* Proxy/Unlock Button */}
+                        <a
+                            href={`https://www.filterbypass.me/go.php?u=${encodeURIComponent(r.link)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="proxy-btn"
+                            title="Bypass ISP Block (Unlock)"
+                        >
+                            🔓
+                        </a>
+                    </div>
                 ))}
             </div>
 

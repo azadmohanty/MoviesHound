@@ -51,11 +51,19 @@ class handler(BaseHTTPRequestHandler):
         # --- 2. SCRAPE (Miss) ---
         results = []
         try:
-            scraper = cloudscraper.create_scraper()
+            # IMPROVED SCRAPER: Uses headers to look like a real browser
+            scraper = cloudscraper.create_scraper(
+                browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+            )
+            scraper.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://www.google.com/"
+            })
+            
             # Construct search URL (logic from original app.py)
             search_url = f"{site_url.rstrip('/')}/?s={keyword.replace(' ', '+')}"
             
-            response = scraper.get(search_url, timeout=5) # 5s timeout per site (Vercel limit safety)
+            response = scraper.get(search_url, timeout=10) # Increased timeout slightly for challenge solving
             
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'html.parser')

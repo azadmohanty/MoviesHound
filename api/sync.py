@@ -11,18 +11,17 @@ from bs4 import BeautifulSoup
 # Format: { "Magic Link": "Site Name" }
 REDIRECT_SOURCES = {
     "https://vegamovies.kg/": "VegaMovies",
-    "https://hdhub4u.tv": "HDHub4u",
     "https://bolly4u.cl": "Bolly4u"
 }
 
 # 2. HUB LISTS
-# These are index pages that list multiple working proxies.
-# logic: We scrape all <a> tags and filter for known patterns.
+# These are "Hubs" or "Lists" that contain links to multiple movie sites.
+# We scrape them to find new domains.
 HUB_SOURCES = [
-    "https://vglist.cv/",
+    "https://hdhub4u.tv/", # HDHub4u's redirector often lands on an intermediate page, so we scrape it
     "https://www.modlist.in/",
     "https://mmodlist.net/",
-    "https://hdhub4u.catering/"
+    "https://vglist.cv/"
 ]
 
 # 3. FILTER PATTERNS (For Hubs)
@@ -143,21 +142,47 @@ class handler(BaseHTTPRequestHandler):
                             if not url.endswith('/'): url += '/'
                             
                             # Heuristic Name Extraction
-                            # e.g. https://moviesmod.town/ -> MOVIESMOD
-                            try:
-                                clean_url = url.replace('www.', '')
-                                clean_name = clean_url.split('//')[-1].split('.')[0].upper()
-                                # Avoid short garbage names and ensure it looks like a domain
-                                if len(clean_name) > 3 and '.' in url:
-                                    found_sites[url] = clean_name
-                            except:
-                                continue
+                            # We can force specific names for known brands to fix subdomains (e.g. new3.hdhub4u...)
+                            clean_name = ""
+                            if "hdhub4u" in url:
+                                clean_name = "HDHub4u"
+                            elif "vegamovies" in url:
+                                clean_name = "VegaMovies"
+                            elif "bolly4u" in url:
+                                clean_name = "Bolly4u"
+                            elif "moviesmod" in url:
+                                clean_name = "MoviesMod"
+                            else:
+                                # Default: Extract from domain
+                                try:
+                                    clean_url = url.replace('www.', '')
+                                    clean_name = clean_url.split('//')[-1].split('.')[0].upper()
+                                except: continue
+
+                            # Avoid short garbage names and ensure it looks like a domain
+                            if len(clean_name) > 2 and '.' in url:
+                                found_sites[url] = clean_name
             except Exception as e:
                 print(f"Failed to scrape hub {hub}: {e}")
                 continue
 
+        # DEDUPLICATION STEP
+        # We might have found the same site via multiple methods (e.g. HTTP vs HTTPS, www vs non-www)
+        # We want to keep only UNIQUE site names.
+        unique_sites = {}
+        seen_names = set()
+        
+        for url, name in found_sites.items():
+            name_upper = name.upper()
+            if name_upper not in seen_names:
+                unique_sites[url] = name # Keep the first one we found
+                seen_names.add(name_upper)
+            else:
+                # OPTIONAL: If we prefer HTTPS, we could swap it here, but keeping first found is usually fine
+                pass
+
         # Prepare Response
-        final_json = json.dumps({"sites": found_sites})
+        final_json = json.dumps({"sites": unique_sites})
 
         # --- 3. SAVE TO CACHE ---
         # Store this result for 12 hours (43200 seconds) since we only get 1 free Cron run per day.
