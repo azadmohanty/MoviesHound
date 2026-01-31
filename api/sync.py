@@ -160,10 +160,11 @@ class handler(BaseHTTPRequestHandler):
         final_json = json.dumps({"sites": found_sites})
 
         # --- 3. SAVE TO CACHE ---
-        # Store this result for 6 hours (21600 seconds)
+        # Store this result for 12 hours (43200 seconds) since we only get 1 free Cron run per day.
+        # This ensures the cache stays valid longer, minimizing user-triggered scrapes.
         try:
             if redis_client:
-                redis_client.set('app:site_config', final_json, ex=21600)
+                redis_client.set('app:site_config', final_json, ex=43200)
         except Exception as e:
             print(f"Failed to save to Redis: {e}")
 
