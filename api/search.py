@@ -50,6 +50,8 @@ class handler(BaseHTTPRequestHandler):
 
         # --- 2. SCRAPE (Miss) ---
         results = []
+        scrape_status = "unknown"
+        
         try:
             # IMPROVED SCRAPER: Uses headers to look like a real browser
             scraper = cloudscraper.create_scraper(
@@ -66,6 +68,7 @@ class handler(BaseHTTPRequestHandler):
             response = scraper.get(search_url, timeout=10) # Increased timeout slightly for challenge solving
             
             if response.status_code == 200:
+                scrape_status = "ok"
                 soup = BeautifulSoup(response.text, 'html.parser')
                 for link_tag in soup.find_all('a', href=True):
                     title = link_tag.get_text().strip()
@@ -76,23 +79,38 @@ class handler(BaseHTTPRequestHandler):
                             # Basic de-duplication
                             if not any(r['link'] == link for r in results):
                                 results.append({"title": title, "link": link, "site": site_name})
+            elif response.status_code in [403, 503]:
+                scrape_status = "blocked"
+                print(f"Blocked (403/503) scraping {site_name}")
+            else:
+                scrape_status = f"http_{response.status_code}"
+                print(f"HTTP {response.status_code} scraping {site_name}")
+
         except Exception as e:
             # We fail silently for the fan-out architecture, just return empty
+            scrape_status = "error"
             print(f"Error scraping {site_name}: {e}")
             pass
 
-        response_json = json.dumps({"results": results})
+        response_json = json.dumps({
+            "results": results, 
+            "status": scrape_status,
+            "cached": False
+        })
 
         # --- 3. CACHE SET ---
-        # Save for 24 hours (86400 seconds) if we found active results or empty list (to prevent spam)
+        # Save for 24 hours (86400 seconds) ONLY if status is "ok" and we have results
+        # Don't cache errors/blocks nicely, or cache them for shorter time?
+        # For now, let's only cache successful hits to avoid poisoning cache with "blocked" states
         try:
-            if redis_client:
+            if redis_client and scrape_status == "ok":
                 redis_client.set(cache_key, response_json, ex=86400)
         except: pass
 
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('X-Cache', 'MISS')
+        self.send_header('X-Scrape-Status', scrape_status)
         self.send_header('X-Redis-Status', redis_status)
         self.end_headers()
         self.wfile.write(response_json.encode())

@@ -20,15 +20,16 @@ type SearchResult = {
 
 type SiteStatus = {
     name: string;
-    status: "idle" | "loading" | "success" | "error";
+    status: "idle" | "loading" | "success" | "error" | "blocked";
     count: number;
+    message?: string;
 };
 
 type Category = "all" | "international" | "indian" | "anime";
 
 // BRAND MAPPING: Define which brand belongs to which category
 const CATEGORY_MAP: Record<string, Category[]> = {
-    "MOVIESMOD": ["international"],
+    "MOVIESMOD": ["international", "anime"],
     "VEGAMOVIES": ["international"],
     "BOLLY4U": ["international", "indian"],
     "HDHUB4U": ["international", "indian"],
@@ -120,28 +121,49 @@ export default function Home() {
 
             fetch(`/api/search?q=${encodeURIComponent(query)}&url=${encodeURIComponent(siteUrl)}&name=${encodeURIComponent(siteName)}`)
                 .then((res) => res.json())
-                .then((data: { results?: SearchResult[] }) => {
+                .then((data: { results?: SearchResult[], status?: string }) => {
                     // CHECK: Is this still the active search?
                     if (searchId.current !== currentId) return;
 
-                    if (data.results) {
-                        setResults((prev) => [...prev, ...data.results!]);
-                        setStatuses((prev) => ({
-                            ...prev,
-                            [siteUrl]: { ...prev[siteUrl], status: "success", count: data.results!.length },
-                        }));
+                    const resultCount = data.results ? data.results.length : 0;
+                    const apiStatus = data.status || "unknown"; // "ok", "blocked", "error"
+
+                    // Determine Final Status
+                    let finalStatus: SiteStatus["status"] = "error";
+                    let msg = "";
+
+                    if (resultCount > 0) {
+                        finalStatus = "success";
                     } else {
-                        setStatuses((prev) => ({
-                            ...prev,
-                            [siteUrl]: { ...prev[siteUrl], status: "error", count: 0 },
-                        }));
+                        // Differentiate why it failed
+                        if (apiStatus === "ok") {
+                            finalStatus = "idle"; // "idle" (Yellow) = Checked but found nothing
+                            msg = "(0)";
+                        } else if (apiStatus === "blocked") {
+                            finalStatus = "blocked"; // New status for blocked (Purple?)
+                            msg = "(Blocked)";
+                        } else {
+                            finalStatus = "error"; // "error" (Red) = Network/Parse error
+                            msg = "(Error)";
+                        }
                     }
+
+                    setResults((prev) => [...prev, ...(data.results || [])]);
+                    setStatuses((prev) => ({
+                        ...prev,
+                        [siteUrl]: {
+                            ...prev[siteUrl],
+                            status: finalStatus,
+                            count: resultCount,
+                            message: msg
+                        },
+                    }));
                 })
                 .catch(() => {
                     if (searchId.current !== currentId) return;
                     setStatuses((prev) => ({
                         ...prev,
-                        [siteUrl]: { ...prev[siteUrl], status: "error", count: 0 },
+                        [siteUrl]: { ...prev[siteUrl], status: "error", count: 0, message: "(Fail)" },
                     }));
                 });
         });
@@ -190,7 +212,9 @@ export default function Home() {
                         <div key={url} className={`status-indicator ${s.status}`}>
                             <div className="dot"></div>
                             <span>{s.name}</span>
-                            {s.count > 0 && <span>({s.count})</span>}
+                            {/* Show message (Blocked/Error/0) OR count if success */}
+                            {s.status === "success" && s.count > 0 && <span>({s.count})</span>}
+                            {s.status !== "success" && s.message && <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>{s.message}</span>}
                         </div>
                     ))}
                 </div>
