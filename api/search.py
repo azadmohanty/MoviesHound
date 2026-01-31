@@ -70,6 +70,12 @@ class handler(BaseHTTPRequestHandler):
             if response.status_code == 200:
                 scrape_status = "ok"
                 soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # DEBUG: Capture Page Title to detect Cloudflare "Just a moment..."
+                page_title = "No Title"
+                if soup.title:
+                    page_title = soup.title.get_text().strip()[:20] # First 20 chars
+
                 for link_tag in soup.find_all('a', href=True):
                     title = link_tag.get_text().strip()
                     link = link_tag.get('href')
@@ -79,6 +85,11 @@ class handler(BaseHTTPRequestHandler):
                             # Basic de-duplication
                             if not any(r['link'] == link for r in results):
                                 results.append({"title": title, "link": link, "site": site_name})
+                
+                # If OK but 0 results, append title to status for debug
+                if not results:
+                    scrape_status = f"ok: {page_title}"
+
             elif response.status_code in [403, 503]:
                 scrape_status = "blocked"
                 print(f"Blocked (403/503) scraping {site_name}")
