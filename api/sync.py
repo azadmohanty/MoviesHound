@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import cloudscraper
+import os
 from bs4 import BeautifulSoup
 
 # --- CONFIGURATION START ---
@@ -9,7 +10,7 @@ from bs4 import BeautifulSoup
 # These are single URLs that automatically redirect to the latest working domain.
 # Format: { "Magic Link": "Site Name" }
 REDIRECT_SOURCES = {
-    "https://vegamovies.la": "VegaMovies",
+    "https://vegamovies.kg/": "VegaMovies",
     "https://hdhub4u.tv": "HDHub4u",
     "https://bolly4u.cl": "Bolly4u"
 }
@@ -44,21 +45,55 @@ IGNORED_DOMAINS = [
 
 # --- CONFIGURATION END ---
 
-# Hardcoded fallback defaults (Safety net)
+# Default sites list (Fallback if scraping fails completely)
 DEFAULT_SITES = {
     "https://moviesmod.town/": "MoviesMod",
     "https://moviesleech.zip/": "MoviesLeech",
     "https://rogmovies.world/": "RogMovies",
     "https://new3.hdhub4u.fo/": "HDHub4u",
-    "https://vegamovies.gratis/": "VegaMovies",
     "https://vegamovies.kg/": "VegaMovies",
     "https://bolly4u.fyi/": "Bolly4u"
 }
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # Check for ?cron=true parameter to force refresh
+        is_cron = "cron=true" in self.path
+        
+        # --- 1. REDIS CACHE CHECK ---
+        # We try to fetch the list from Redis first (unless it's a cron job forcing update)
+        redis_client = None
+        try:
+            redis_url = os.environ.get("KV_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
+            if redis_url:
+                import redis
+                redis_client = redis.from_url(redis_url)
+                
+                # Only return cached data if this IS NOT a cron job
+                if not is_cron:
+                    cached_sites = redis_client.get('app:site_config')
+                    if cached_sites:
+                        self.send_response(200)
+                        self.send_header('Content-type', 'application/json')
+                        self.send_header('X-Sync-Source', 'Redis-Cache')
+                        self.end_headers()
+                        self.wfile.write(cached_sites)
+                        return
+        except Exception as e:
+            print(f"Redis Cache Error: {e}")
+
+        # --- 2. THE HEAVY LIFTING (Scraping) ---
         found_sites = DEFAULT_SITES.copy()
-        scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
+        
+        # IMPROVED SCRAPER: Uses headers to look like a real chrome user coming from google
+        # This helps bypass Cloudflare on sites like ModList
+        scraper = cloudscraper.create_scraper(
+            browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+        )
+        scraper.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.google.com/"
+        })
         
         # STRATEGY 1: RESOLVE REDIRECTS
         for magic_url, name in REDIRECT_SOURCES.items():
@@ -121,7 +156,19 @@ class handler(BaseHTTPRequestHandler):
                 print(f"Failed to scrape hub {hub}: {e}")
                 continue
 
+        # Prepare Response
+        final_json = json.dumps({"sites": found_sites})
+
+        # --- 3. SAVE TO CACHE ---
+        # Store this result for 6 hours (21600 seconds)
+        try:
+            if redis_client:
+                redis_client.set('app:site_config', final_json, ex=21600)
+        except Exception as e:
+            print(f"Failed to save to Redis: {e}")
+
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
+        self.send_header('X-Sync-Source', 'Live-Scrape')
         self.end_headers()
-        self.wfile.write(json.dumps({"sites": found_sites}).encode())
+        self.wfile.write(final_json.encode())

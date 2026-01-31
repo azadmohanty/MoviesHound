@@ -25,8 +25,24 @@ type SiteStatus = {
     count: number;
 };
 
+type Category = "all" | "international" | "indian" | "anime";
+
+// BRAND MAPPING: Define which brand belongs to which category
+const CATEGORY_MAP: Record<string, Category[]> = {
+    "MOVIESMOD": ["international"],
+    "VEGAMOVIES": ["international"],
+    "BOLLY4U": ["international", "indian"],
+    "HDHUB4U": ["international", "indian"],
+    "MOVIESLEECH": ["indian"],
+    "ROGMOVIES": ["indian"],
+    "ANIMEFLIX": ["anime"],
+    "GOKUHD": ["anime"],
+    // Fallback: if a site isn't listed here, it appears in "all"
+};
+
 export default function Home() {
     const [query, setQuery] = useState("");
+    const [category, setCategory] = useState<Category>("all");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [sites, setSites] = useState(DEFAULT_SITES);
     const [statuses, setStatuses] = useState<Record<string, SiteStatus>>({});
@@ -35,8 +51,9 @@ export default function Home() {
     // TRACKING: Prevent race conditions from old searches
     const searchId = React.useRef(0);
 
-    // Load synced sites on mount
+    // Load synced sites on mount AND refresh in background
     useEffect(() => {
+        // 1. Load local immediately (fastest)
         const saved = localStorage.getItem("movie_sites");
         if (saved) {
             try {
@@ -45,9 +62,14 @@ export default function Home() {
                 console.error("Failed to parse saved sites", e);
             }
         }
+
+        // 2. Refresh from Server (Silent Sync)
+        // Since the server now caches the result for 6 hours, this is very cheap.
+        // It ensures the user always has up-to-date sites without clicking anything.
+        syncSites(true);
     }, []);
 
-    const syncSites = async () => {
+    const syncSites = async (isSilent = false) => {
         setIsSyncing(true);
         try {
             const res = await fetch("/api/sync");
@@ -55,9 +77,12 @@ export default function Home() {
             const data = await res.json();
             setSites(data.sites);
             localStorage.setItem("movie_sites", JSON.stringify(data.sites));
-            alert(`Synced! Found ${Object.keys(data.sites).length} active sites.`);
+
+            if (!isSilent) {
+                alert(`Synced! Found ${Object.keys(data.sites).length} active sites.`);
+            }
         } catch (e: unknown) {
-            alert("Failed to sync sites. Using offline defaults.");
+            if (!isSilent) alert("Failed to sync sites. Using offline defaults.");
         } finally {
             setIsSyncing(false);
         }
@@ -74,15 +99,23 @@ export default function Home() {
         setResults([]); // Clear previous
         const newStatuses: Record<string, SiteStatus> = {};
 
+        // 2. FILTER SITES based on Category
+        const activeSites = Object.entries(sites).filter(([url, name]) => {
+            if (category === "all") return true;
+
+            const siteCategories = CATEGORY_MAP[name.toUpperCase()] || [];
+            return siteCategories.includes(category);
+        });
+
         // Initialize statuses
-        Object.entries(sites).forEach(([url, name]) => {
+        activeSites.forEach(([url, name]) => {
             newStatuses[url] = { name, status: "loading", count: 0 };
         });
         setStatuses(newStatuses);
 
         // FAN-OUT: Trigger all fetches in parallel
-        Object.entries(sites).forEach(([url, name]) => {
-            // Explicitly cast to prevent 'unknown' errors if strict mode complains
+        activeSites.forEach(([url, name]) => {
+            // Explicitly cast to prevent 'unknown' errors
             const siteUrl = url as string;
             const siteName = name as string;
 
@@ -118,7 +151,7 @@ export default function Home() {
     return (
         <main>
             <div className="actions">
-                <button className="btn" onClick={syncSites} disabled={isSyncing}>
+                <button className="btn" onClick={() => syncSites(false)} disabled={isSyncing}>
                     {isSyncing ? "⚡ Syncing..." : "⚡ Refresh Sites"}
                 </button>
             </div>
@@ -126,18 +159,32 @@ export default function Home() {
             <h1>MoviesHound</h1>
             <p className="subtitle">Search Once. Watch Anywhere.</p>
 
+            {/* Category Filter Pills */}
+            <div className="category-filter">
+                {(["all", "international", "indian", "anime"] as Category[]).map((cat) => (
+                    <button
+                        key={cat}
+                        className={`filter-pill ${category === cat ? "active" : ""}`}
+                        onClick={() => setCategory(cat)}
+                        type="button"
+                    >
+                        {cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </button>
+                ))}
+            </div>
+
             <form onSubmit={handleSearch}>
                 <input
                     type="text"
                     className="search-box"
-                    placeholder="Enter Movie Name (e.g. Batman)..."
+                    placeholder={`Search ${category === 'all' ? 'Movies' : category + ' movies'}...`}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     autoFocus
                 />
             </form>
 
-            {/* Progress Indicators */}
+            {/* Progress Indicators - Only show for filtered sites */}
             {Object.keys(statuses).length > 0 && (
                 <div className="status-bar">
                     {Object.entries(statuses).map(([url, s]) => (
