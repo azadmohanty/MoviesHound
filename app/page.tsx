@@ -140,11 +140,12 @@ export default function Home() {
                             finalStatus = "idle"; // "idle" (Yellow) = Checked but found nothing
                             msg = "(0)";
                         } else if (apiStatus === "blocked") {
-                            finalStatus = "blocked"; // New status for blocked (Purple?)
+                            finalStatus = "blocked";
                             msg = "(Blocked)";
                         } else {
-                            finalStatus = "error"; // "error" (Red) = Network/Parse error
-                            msg = "(Error)";
+                            finalStatus = "error";
+                            // DEBUG: Show the actual status from backend (e.g. "http_503", "error")
+                            msg = `(${apiStatus})`;
                         }
                     }
 
