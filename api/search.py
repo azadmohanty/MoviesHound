@@ -71,20 +71,39 @@ class handler(BaseHTTPRequestHandler):
                 scrape_status = "ok"
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # DEBUG: Capture Page Title to detect Cloudflare "Just a moment..."
+                # DEBUG: Capture Page Title
                 page_title = "No Title"
                 if soup.title:
-                    page_title = soup.title.get_text().strip()[:20] # First 20 chars
+                    page_title = soup.title.get_text().strip()[:20]
 
-                for link_tag in soup.find_all('a', href=True):
-                    title = link_tag.get_text().strip()
-                    link = link_tag.get('href')
-                    
-                    if len(title) > 3 and keyword.lower() in title.lower():
-                        if link.startswith('http') and "/?s=" not in link:
-                            # Basic de-duplication
-                            if not any(r['link'] == link for r in results):
+                # --- IMPROVED SCRAPING STRATEGY ---
+                
+                # 1. Look for specific WordPress Search Result Titles (High Confidence)
+                # Most sites use <h2 class="entry-title"><a ...> or similar
+                for header in soup.find_all(['h2', 'h3', 'h4', 'h1'], class_=lambda c: c and ('title' in c or 'entry' in c or 'post' in c)):
+                    link_tag = header.find('a', href=True)
+                    if link_tag:
+                        title = link_tag.get_text().strip()
+                        link = link_tag.get('href')
+                        if keyword.lower() in title.lower():
+                             if not any(r['link'] == link for r in results):
                                 results.append({"title": title, "link": link, "site": site_name})
+
+                # 2. Fallback: Scan ALL links if we haven't found much
+                if len(results) < 2:
+                    for link_tag in soup.find_all('a', href=True):
+                        title = link_tag.get_text(" ", strip=True) # Normalize whitespace
+                        link = link_tag.get('href')
+                        
+                        # Filter out navigation junk
+                        if len(title) < 4: continue
+                        if any(x in title.lower() for x in ['home', 'contact', 'dmca', 'download', 'read more', 'page', 'search']):
+                            continue
+
+                        if keyword.lower() in title.lower():
+                            if link.startswith('http') and "/?s=" not in link and "wp-json" not in link:
+                                if not any(r['link'] == link for r in results):
+                                    results.append({"title": title, "link": link, "site": site_name})
                 
                 # If OK but 0 results, append title to status for debug
                 if not results:
