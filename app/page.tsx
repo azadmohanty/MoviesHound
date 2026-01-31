@@ -122,6 +122,9 @@ export default function Home() {
             fetch(`/api/search?q=${encodeURIComponent(query)}&url=${encodeURIComponent(siteUrl)}&name=${encodeURIComponent(siteName)}`)
                 .then((res) => res.json())
                 .then((data: { results?: SearchResult[], status?: string }) => {
+                    // DEBUG: Inspect what we are actually receiving
+                    console.log(`[DEBUG] Response for ${siteName}:`, data);
+
                     // CHECK: Is this still the active search?
                     if (searchId.current !== currentId) return;
 
