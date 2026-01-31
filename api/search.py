@@ -59,7 +59,7 @@ class handler(BaseHTTPRequestHandler):
             )
             scraper.headers.update({
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": "https://www.google.com/"
+                "Referer": site_url  # MATCHING TEST.PY: Use internal referer
             })
             
             # Construct search URL (logic from original app.py)
@@ -76,10 +76,9 @@ class handler(BaseHTTPRequestHandler):
                 if soup.title:
                     page_title = soup.title.get_text().strip()[:20]
 
-                # --- IMPROVED SCRAPING STRATEGY ---
-                
-                # 1. Look for specific WordPress Search Result Titles (High Confidence)
-                # Most sites use <h2 class="entry-title"><a ...> or similar
+                # --- HYBRID STRATEGY ---
+                # 1. Try Smart WordPress Titles first (High Quality)
+                found_smart = False
                 for header in soup.find_all(['h2', 'h3', 'h4', 'h1'], class_=lambda c: c and ('title' in c or 'entry' in c or 'post' in c)):
                     link_tag = header.find('a', href=True)
                     if link_tag:
@@ -88,20 +87,18 @@ class handler(BaseHTTPRequestHandler):
                         if keyword.lower() in title.lower():
                              if not any(r['link'] == link for r in results):
                                 results.append({"title": title, "link": link, "site": site_name})
+                                found_smart = True
 
-                # 2. Fallback: Scan ALL links if we haven't found much
-                if len(results) < 2:
+                # 2. Fallback: GREEDY SEARCH (Matching test.py exactly)
+                # If smart search found nothing, do the broad sweep
+                if not found_smart:
                     for link_tag in soup.find_all('a', href=True):
-                        title = link_tag.get_text(" ", strip=True) # Normalize whitespace
+                        title = link_tag.get_text().strip()
                         link = link_tag.get('href')
                         
-                        # Filter out navigation junk
-                        if len(title) < 4: continue
-                        if any(x in title.lower() for x in ['home', 'contact', 'dmca', 'download', 'read more', 'page', 'search']):
-                            continue
-
-                        if keyword.lower() in title.lower():
-                            if link.startswith('http') and "/?s=" not in link and "wp-json" not in link:
+                        # LOGIC FROM TEST.PY:
+                        if len(title) > 3 and keyword.lower() in title.lower():
+                            if link.startswith('http') and "/?s=" not in link:
                                 if not any(r['link'] == link for r in results):
                                     results.append({"title": title, "link": link, "site": site_name})
                 
