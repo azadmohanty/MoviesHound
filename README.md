@@ -45,7 +45,7 @@ You can manage the search sources in `api/sync.py`:
 *   **Hub Sources**: Add list sites to scrape for new domains.
 *   **Ignored Domains**: Add domains to blacklist from the sync results.
 
-## 📦 Deployment
+## 📦 Deploymen
 
 1.  Push your code to **GitHub**.
 2.  Import the repository to **Vercel**.
