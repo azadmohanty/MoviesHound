@@ -142,12 +142,61 @@ h1 {
   /* Touch target */
 }
 
-.proxy-btn:hover {
-  background: var(--success-color);
-  border-color: var(--success-color);
-  transform: translateY(-2px);
-  color: #fff;
+.status-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  /* Ensure they wrap, don't stack vertically */
+  align-items: center;
 }
+
+.status-indicator {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  background: #262626;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  /* Prevent internal wrapping */
+}
+
+.status-indicator.loading .dot {
+  background-color: #fbbf24;
+  animation: pulse 1s infinite;
+}
+
+.status-indicator.success .dot {
+  background-color: var(--success-color);
+}
+
+.status-indicator.error .dot {
+  background-color: #ef4444;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #666;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
 
 /* Category Filter Styles */
 .category-filter {
