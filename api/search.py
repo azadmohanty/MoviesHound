@@ -19,66 +19,51 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": "Missing params"}).encode())
             return
 
-        # --- 1. CACHE CHECK (Redis) ---
+        # 1. CACHE CHECK
         cache_key = f"search:{site_name}:{keyword.lower().strip()}"
         redis_client = None
-        redis_status = "Not Initialized"
-        
         try:
             redis_url = os.environ.get("KV_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")
-            
             if redis_url:
                 redis_client = redis.from_url(redis_url)
-                # Build connection to verify
-                redis_client.ping() 
-                redis_status = "Connected"
-                
-                cached_data = redis_client.get(cache_key)
-                if cached_data:
+                cached = redis_client.get(cache_key)
+                if cached:
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
                     self.send_header('X-Cache', 'HIT')
-                    self.send_header('X-Redis-Status', 'Connected')
                     self.end_headers()
-                    self.wfile.write(cached_data)
+                    self.wfile.write(cached)
                     return
-            else:
-                redis_status = "Missing URL Env Var"
-        except Exception as e:
-            print(f"Redis Error: {e}")
-            redis_status = f"Error: {str(e)}"
+        except: pass
 
-        # --- 2. SCRAPE (Miss) ---
+        # 2. SCRAPE
         results = []
         scrape_status = "unknown"
         
         try:
-            # IMPROVED SCRAPER: Uses headers to look like a real browser
             scraper = cloudscraper.create_scraper(
                 browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
             )
+            # CRITICAL: Use Referer = site_url (Matches test.py success)
             scraper.headers.update({
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": site_url  # MATCHING TEST.PY: Use internal referer
+                "Referer": site_url 
             })
             
-            # Construct search URL (logic from original app.py)
             search_url = f"{site_url.rstrip('/')}/?s={keyword.replace(' ', '+')}"
-            
-            response = scraper.get(search_url, timeout=10) # Increased timeout slightly for challenge solving
+            response = scraper.get(search_url, timeout=10)
             
             if response.status_code == 200:
                 scrape_status = "ok"
                 soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # DEBUG: Capture Page Title
-                page_title = "No Title"
-                if soup.title:
-                    page_title = soup.title.get_text().strip()[:20]
 
-                # --- HYBRID STRATEGY ---
-                # 1. Try Smart WordPress Titles first (High Quality)
+                # DEBUG TITLE (Simple)
+                page_title = soup.title.get_text().strip()[:20] if soup.title else "No Title"
+
+                # STRATEGY: Hybrid (Smart Header -> Fallback Greedy)
                 found_smart = False
+                
+                # 1. Smart Headers
                 for header in soup.find_all(['h2', 'h3', 'h4', 'h1'], class_=lambda c: c and ('title' in c or 'entry' in c or 'post' in c)):
                     link_tag = header.find('a', href=True)
                     if link_tag:
@@ -89,55 +74,43 @@ class handler(BaseHTTPRequestHandler):
                                 results.append({"title": title, "link": link, "site": site_name})
                                 found_smart = True
 
-                # 2. Fallback: GREEDY SEARCH (Matching test.py exactly)
-                # If smart search found nothing, do the broad sweep
+                # 2. Greedy Fallback (If smart found nothing)
                 if not found_smart:
                     for link_tag in soup.find_all('a', href=True):
                         title = link_tag.get_text().strip()
                         link = link_tag.get('href')
                         
-                        # LOGIC FROM TEST.PY:
+                        # LOGIC MATCHING TEST.PY
                         if len(title) > 3 and keyword.lower() in title.lower():
                             if link.startswith('http') and "/?s=" not in link:
                                 if not any(r['link'] == link for r in results):
                                     results.append({"title": title, "link": link, "site": site_name})
                 
-                # If OK but 0 results, append title to status for debug
                 if not results:
                     scrape_status = f"ok: {page_title}"
 
             elif response.status_code in [403, 503]:
                 scrape_status = "blocked"
-                print(f"Blocked (403/503) scraping {site_name}")
             else:
                 scrape_status = f"http_{response.status_code}"
-                print(f"HTTP {response.status_code} scraping {site_name}")
 
         except Exception as e:
-            # We fail silently for the fan-out architecture, just return empty
             scrape_status = "error"
             print(f"Error scraping {site_name}: {e}")
-            pass
 
         response_json = json.dumps({
             "results": results, 
-            "status": scrape_status,
-            "cached": False
+            "status": scrape_status
         })
 
-        # --- 3. CACHE SET ---
-        # Save for 24 hours (86400 seconds) ONLY if status is "ok" and we have results
-        # Don't cache errors/blocks nicely, or cache them for shorter time?
-        # For now, let's only cache successful hits to avoid poisoning cache with "blocked" states
+        # 3. CACHE SAVE
         try:
-            if redis_client and scrape_status == "ok":
+            if redis_client and scrape_status == "ok" and results:
                 redis_client.set(cache_key, response_json, ex=86400)
         except: pass
 
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
-        self.send_header('X-Cache', 'MISS')
         self.send_header('X-Scrape-Status', scrape_status)
-        self.send_header('X-Redis-Status', redis_status)
         self.end_headers()
         self.wfile.write(response_json.encode())
