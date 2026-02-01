@@ -169,7 +169,7 @@ class handler(BaseHTTPRequestHandler):
 
         # Cache
         if redis_client:
-            try: redis_client.set('app:site_config_v2', final_json, ex=43200)
+            try: redis_client.set('app:site_config_v2', final_json, ex=86400)
             except: pass
 
         self.send_response(200)
