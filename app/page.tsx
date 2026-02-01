@@ -226,50 +226,63 @@ export default function Home() {
 
     return (
         <main>
-            <div className="actions">
-                <button className="btn" onClick={() => syncSites(false)} disabled={isSyncing}>
-                    {isSyncing ? "⚡ Syncing..." : "⚡ Refresh Sites"}
-                </button>
-                {syncMessage && <span className="sync-msg">{syncMessage}</span>}
+            <div className="header">
+                <div className="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM10 16.5V7.5L16 12L10 16.5Z" fill="url(#brand-grad)" />
+                        <defs>
+                            <linearGradient id="brand-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                                <stop stopColor="#60a5fa" />
+                                <stop offset="1" stopColor="#2563eb" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1>MoviesHound</h1>
+                <p className="subtitle">Search Once. Watch Anywhere.</p>
             </div>
 
-            <h1>MoviesHound</h1>
-            <p className="subtitle">Search Once. Watch Anywhere.</p>
+            <div className="search-section">
+                <form onSubmit={handleSearch}>
+                    <div className="search-wrapper">
+                        <input
+                            type="text"
+                            className="search-box"
+                            placeholder={`Search ${category === 'all' ? 'Movies & Series' : category + ' Content'}...`}
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            autoFocus
+                        />
+                        <button type="submit" className="search-btn">🔍</button>
+                    </div>
+                </form>
 
-            <div className="category-filter">
-                {(["all", "international", "indian", "anime", "korean"] as Category[]).map((cat) => (
-                    <button
-                        key={cat}
-                        className={`filter-pill ${category === cat ? "active" : ""}`}
-                        onClick={() => setCategory(cat)}
-                        type="button"
-                    >
-                        {cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </button>
-                ))}
+                <div className="category-filter">
+                    {(["all", "international", "indian", "anime", "korean"] as Category[]).map((cat) => (
+                        <button
+                            key={cat}
+                            className={`filter-pill ${category === cat ? "active" : ""}`}
+                            onClick={() => setCategory(cat)}
+                            type="button"
+                        >
+                            {cat === "all" ? "All" : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        </button>
+                    ))}
+                </div>
             </div>
-
-            <form onSubmit={handleSearch}>
-                <input
-                    type="text"
-                    className="search-box"
-                    placeholder={`Search ${category === 'all' ? 'Movies' : category + ' movies'}...`}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    autoFocus
-                />
-            </form>
 
             {Object.keys(statuses).length > 0 && (
-                <div className="status-bar">
-                    {Object.entries(statuses).map(([url, s]) => (
-                        <div key={url} className={`status-indicator ${s.status}`}>
-                            <div className="dot"></div>
-                            <span>{s.name}</span>
-                            {s.status === "success" && s.count > 0 && <span>({s.count})</span>}
-                            {s.status !== "success" && s.message && <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>{s.message}</span>}
-                        </div>
-                    ))}
+                <div className="status-container">
+                    <div className="status-bar">
+                        {Object.entries(statuses).map(([url, s]) => (
+                            <div key={url} className={`status-indicator ${s.status}`}>
+                                <div className="dot"></div>
+                                <span>{s.name}</span>
+                                {s.status === "success" && s.count > 0 && <span>({s.count})</span>}
+                                {s.status !== "success" && s.message && <span className="status-msg">{s.message}</span>}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
@@ -277,14 +290,16 @@ export default function Home() {
                 {results.map((r, i) => (
                     <div key={i} className="result-card-container">
                         <a href={r.link} target="_blank" rel="noopener noreferrer" className="result-card">
-                            <div>
+                            <div className="card-content">
                                 <h3>{r.title}</h3>
-                                <span className="site-badge">{r.site}</span>
+                                <div className="card-meta">
+                                    <span className="site-badge">{r.site}</span>
+                                </div>
                             </div>
                             <span className="arrow">↗</span>
                         </a>
                         <a
-                            href={`https://www.filterbypass.me/go.php?u=${encodeURIComponent(r.link)}`}
+                            href={`https://proxyium.com/search?url=${encodeURIComponent(r.link)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="proxy-btn"
@@ -296,36 +311,36 @@ export default function Home() {
                 ))}
             </div>
 
-            <div className="info-card">
-                <h3>How it works</h3>
-                <div className="info-grid">
-                    <div className="info-item">
-                        <h4>🔍 Search</h4>
-                        <p>Enter a movie or series Name. We scan multiple sites in parallel for you.</p>
+            <div className="bottom-actions">
+                <button className="sync-btn" onClick={() => syncSites(false)} disabled={isSyncing}>
+                    {isSyncing ? "⚡ Syncing Database..." : "⚡ Refresh Working Sites"}
+                </button>
+                {syncMessage && <span className="sync-msg-toast">{syncMessage}</span>}
+            </div>
+
+            <div className="info-section">
+                <div className="info-header">
+                    <h3>The MoviesHound Advantage</h3>
+                    <p>Designed for speed, built for reliability.</p>
+                </div>
+                <div className="info-steps">
+                    <div className="step">
+                        <div className="step-icon">01</div>
+                        <h4>Instant Search</h4>
+                        <p>We query 10+ providers in parallel to find the best quality links in seconds.</p>
                     </div>
-                    <div className="info-item">
-                        <h4>⚡ Instant Links</h4>
-                        <p>Click any result to go directly to the download page. No middlemen.</p>
+                    <div className="step">
+                        <div className="step-icon">02</div>
+                        <h4>No ISP Blocks</h4>
+                        <p>Use the unlock icon to bypass region restrictions and provider blocks instantly.</p>
                     </div>
-                    <div className="info-item">
-                        <h4>🛠️ Auto-Sync</h4>
-                        <p>Links broken? Click <b>Refresh Sites</b> to automatically find new working URLs.</p>
+                    <div className="step">
+                        <div className="step-icon">03</div>
+                        <h4>Daily Sync</h4>
+                        <p>Our autonomous bot verifies URLs daily to ensure you never hit a dead link.</p>
                     </div>
                 </div>
             </div>
-
-            <style jsx>{`
-                .sync-msg {
-                    margin-left: 10px;
-                    font-size: 0.9rem;
-                    color: var(--text-secondary);
-                    animation: fadeIn 0.3s ease;
-                }
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-            `}</style>
         </main>
     );
 }
