@@ -84,11 +84,15 @@ export default function Home() {
                 uniqueSites[bestUrl] = rawSites[bestUrl];
             });
 
-            setSites(uniqueSites);
-            localStorage.setItem("movie_sites", JSON.stringify(uniqueSites));
+            // MERGE: Defaults + API Results (API wins collisions)
+            // This ensures if API only finds 1 site, we still keep the others from defaults
+            const mergedSites = { ...DEFAULT_SITES, ...uniqueSites };
+
+            setSites(mergedSites);
+            localStorage.setItem("movie_sites", JSON.stringify(mergedSites));
 
             if (!isSilent) {
-                alert(`Synced! Found ${Object.keys(uniqueSites).length} active sites.`);
+                alert(`Synced! Active Config: ${Object.keys(mergedSites).length} sites.`);
             }
         } catch (e: unknown) {
             if (!isSilent) alert("Failed to sync sites. Using offline defaults.");
