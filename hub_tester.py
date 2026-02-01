@@ -3,9 +3,9 @@ from bs4 import BeautifulSoup
 import time
 
 # --- CONFIGURATION ---
-TEST_HUB_URL = None
+TEST_HUB_URL = "https://www.modlist.in/"
 # Set to None if you only want to test Hubs
-TEST_REDIRECT_URL = "https://bollyflix.to/?re-bollyflix" 
+TEST_REDIRECT_URL = None 
 
 # MIRROR PRODUCTION WHITELIST
 ALLOWED_BRANDS = {

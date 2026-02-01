@@ -78,6 +78,30 @@ class handler(BaseHTTPRequestHandler):
                     found_sites[final_b4u] = "Bolly4u"
         except: pass
 
+        # --- 1b. SPECIAL: Resolve BollyFlix (Landing Page Method) ---
+        try:
+            # 1. Get Landing Page
+            landing = scraper.get("https://bollyflix.to", timeout=4.0)
+            if landing.status_code == 200:
+                soup = BeautifulSoup(landing.text, 'html.parser')
+                # 2. Extract Redir Param from Button
+                btn = soup.find("a", attrs={"onclick": True})
+                if btn and "location.href" in btn['onclick']:
+                    # Extract content between single quotes: location.href = '?re-bollyflix'
+                    path = btn['onclick'].split("'")[1] 
+                    if path.startswith('?'):
+                        final_redir = f"https://bollyflix.to{path}"
+                        
+                        # 3. Follow Redirect
+                        resp = scraper.get(final_redir, timeout=4.0, allow_redirects=True)
+                        if resp.status_code == 200:
+                            clean_url = resp.url
+                            if not clean_url.endswith('/'): clean_url += '/'
+                            # Verify valid domain
+                            if "bollyflix" in clean_url:
+                                found_sites[clean_url] = "BollyFlix"
+        except: pass
+
         # --- 2. SCRAPE HUBS ---
         for hub in HUB_SOURCES:
             try:
