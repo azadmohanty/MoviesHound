@@ -9,7 +9,10 @@ const DEFAULT_SITES: Record<string, string> = {
     "https://bolly4u.cl/": "Bolly4u",
     "https://moviesleech.zip/": "MoviesLeech",
     "https://rogmovies.world/": "RogMovies",
-    "https://animeflix.dad/": "Animeflix"
+    "https://animeflix.dad/": "Animeflix",
+    "https://onlykdrama.top/": "OnlyKDrama",
+    "https://mkvdrama.net/": "MKVDrama",
+    "https://bollyflix.sarl/": "BollyFlix"
 };
 
 type SearchResult = {
@@ -25,16 +28,19 @@ type SiteStatus = {
     message?: string;
 };
 
-type Category = "all" | "international" | "indian" | "anime";
+type Category = "all" | "international" | "indian" | "anime" | "korean";
 
 // BRAND MAPPING (Fresh Rules)
 const CATEGORY_MAP: Record<string, Category[]> = {
-    "MOVIESMOD": ["international"],
+    "MOVIESMOD": ["international", "korean","anime"],
     "VEGAMOVIES": ["international"],
     "BOLLY4U": ["international", "indian"],
     "MOVIESLEECH": ["indian"],
     "ROGMOVIES": ["indian"],
     "ANIMEFLIX": ["anime"],
+    "ONLYKDRAMA": ["korean"],
+    "MKVDRAMA": ["korean"],
+    "BOLLYFLIX": ["international", "indian"],
 };
 
 export default function Home() {
@@ -183,7 +189,7 @@ export default function Home() {
             <p className="subtitle">Search Once. Watch Anywhere.</p>
 
             <div className="category-filter">
-                {(["all", "international", "indian", "anime"] as Category[]).map((cat) => (
+                {(["all", "international", "indian", "anime", "korean"] as Category[]).map((cat) => (
                     <button
                         key={cat}
                         className={`filter-pill ${category === cat ? "active" : ""}`}

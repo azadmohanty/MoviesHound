@@ -24,7 +24,9 @@ ALLOWED_BRANDS = {
     "moviesleech": "MoviesLeech",
     "rogmovies": "RogMovies",
     "animeflix": "Animeflix",
-    "gokuhd": "GokuHD"
+    "onlykdrama": "OnlyKDrama",
+    "mkvdrama": "MKVDrama",
+    "bollyflix": "BollyFlix"
 }
 
 # 3. IGNORED DOMAINS
