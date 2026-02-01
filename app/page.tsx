@@ -9,8 +9,7 @@ const DEFAULT_SITES: Record<string, string> = {
     "https://bolly4u.cl/": "Bolly4u",
     "https://moviesleech.zip/": "MoviesLeech",
     "https://rogmovies.world/": "RogMovies",
-    "https://animeflix.live/": "Animeflix", // Placeholder, will sync
-    "https://gokuhd.com/": "GokuHD"         // Placeholder
+    "https://animeflix.dad/": "Animeflix"
 };
 
 type SearchResult = {
@@ -36,7 +35,6 @@ const CATEGORY_MAP: Record<string, Category[]> = {
     "MOVIESLEECH": ["indian"],
     "ROGMOVIES": ["indian"],
     "ANIMEFLIX": ["anime"],
-    "GOKUHD": ["anime"],
 };
 
 export default function Home() {
