@@ -37,3 +37,6 @@ yarn-error.log*
 
 # Vercel
 .vercel
+site_tester.py  
+hub_tester.py  
+__pycache__/ 
