@@ -1,18 +1,22 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 
 // NEW DEFAULTS (Fresh Start)
-const DEFAULT_SITES: Record<string, string> = {
-    "https://moviesmod.town/": "MoviesMod",
-    "https://vegamovies.gratis/": "VegaMovies",
-    "https://bolly4u.cl/": "Bolly4u",
-    "https://moviesleech.zip/": "MoviesLeech",
-    "https://rogmovies.world/": "RogMovies",
-    "https://animeflix.dad/": "Animeflix",
-    "https://onlykdrama.top/": "OnlyKDrama",
-    "https://mkvdrama.net/": "MKVDrama",
-    "https://bollyflix.sarl/": "BollyFlix"
+type SiteConfig = {
+    name: string;
+    categories: string[];
+};
+
+const DEFAULT_SITES: Record<string, SiteConfig> = {
+    "https://moviesmod.town/": { name: "MoviesMod", categories: ["international", "korean", "anime"] },
+    "https://vegamovies.gratis/": { name: "VegaMovies", categories: ["international"] },
+    "https://bolly4u.cl/": { name: "Bolly4u", categories: ["international", "indian"] },
+    "https://moviesleech.zip/": { name: "MoviesLeech", categories: ["indian"] },
+    "https://rogmovies.world/": { name: "RogMovies", categories: ["indian"] },
+    "https://animeflix.dad/": { name: "Animeflix", categories: ["anime"] },
+    "https://onlykdrama.top/": { name: "OnlyKDrama", categories: ["korean"] },
+    "https://mkvdrama.net/": { name: "MKVDrama", categories: ["korean"] },
+    "https://bollyflix.sarl/": { name: "BollyFlix", categories: ["international", "indian"] }
 };
 
 type SearchResult = {
@@ -30,51 +34,48 @@ type SiteStatus = {
 
 type Category = "all" | "international" | "indian" | "anime" | "korean";
 
-// BRAND MAPPING (Fresh Rules)
-const CATEGORY_MAP: Record<string, Category[]> = {
-    "MOVIESMOD": ["international", "korean","anime"],
-    "VEGAMOVIES": ["international"],
-    "BOLLY4U": ["international", "indian"],
-    "MOVIESLEECH": ["indian"],
-    "ROGMOVIES": ["indian"],
-    "ANIMEFLIX": ["anime"],
-    "ONLYKDRAMA": ["korean"],
-    "MKVDRAMA": ["korean"],
-    "BOLLYFLIX": ["international", "indian"],
-};
-
 export default function Home() {
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<Category>("all");
     const [results, setResults] = useState<SearchResult[]>([]);
-    const [sites, setSites] = useState(DEFAULT_SITES);
+    const [sites, setSites] = useState<Record<string, SiteConfig>>(DEFAULT_SITES);
     const [statuses, setStatuses] = useState<Record<string, SiteStatus>>({});
     const [isSyncing, setIsSyncing] = useState(false);
+    const [syncMessage, setSyncMessage] = useState<string>("");
 
     const searchId = React.useRef(0);
 
     useEffect(() => {
-        const saved = localStorage.getItem("movie_sites");
+        const saved = localStorage.getItem("movie_sites_v2");
         if (saved) {
-            try { setSites(JSON.parse(saved)); } catch (e) { }
+            try {
+                const parsed = JSON.parse(saved);
+                // Simple validation to ensure it's the new format
+                const sample = Object.values(parsed)[0] as any;
+                if (sample && typeof sample === 'object' && 'categories' in sample) {
+                    setSites(parsed);
+                }
+            } catch (e) { }
         }
         syncSites(true);
     }, []);
 
     const syncSites = async (isSilent = false) => {
         setIsSyncing(true);
+        setSyncMessage("Syncing...");
         try {
             const res = await fetch("/api/sync");
             if (!res.ok) throw new Error("Sync failed");
             const data = await res.json();
 
             // CLIENT-SIDE SAFETY DEDUPLICATION
-            const rawSites = data.sites;
-            const uniqueSites: Record<string, string> = {};
+            const rawSites = data.sites; // Now Record<string, SiteConfig>
+            const uniqueSites: Record<string, SiteConfig> = {};
             const grouped: Record<string, string[]> = {};
 
-            Object.entries(rawSites).forEach(([url, name]) => {
-                const n = (name as string).toUpperCase();
+            Object.entries(rawSites).forEach(([url, config]) => {
+                const c = config as SiteConfig;
+                const n = c.name.toUpperCase();
                 if (!grouped[n]) grouped[n] = [];
                 grouped[n].push(url);
             });
@@ -88,18 +89,54 @@ export default function Home() {
                 uniqueSites[bestUrl] = rawSites[bestUrl];
             });
 
-            // MERGE: Defaults + API Results (API wins collisions)
-            // This ensures if API only finds 1 site, we still keep the others from defaults
-            const mergedSites = { ...DEFAULT_SITES, ...uniqueSites };
+            // MERGE LOGIC: Merge based on BRAND NAME (Value) instead of URL (Key)
+            // 1. Convert Defaults to Map<Name, URL>
+            const defaultsByName: Record<string, string> = {};
+            Object.entries(DEFAULT_SITES).forEach(([url, config]) => {
+                defaultsByName[config.name] = url;
+            });
 
-            setSites(mergedSites);
-            localStorage.setItem("movie_sites", JSON.stringify(mergedSites));
+            // 2. Convert Sync Results to Map<Name, URL>
+            const syncByName: Record<string, string> = {};
+            Object.entries(uniqueSites).forEach(([url, config]) => {
+                syncByName[config.name] = url;
+            });
+
+            // 3. Merge Sync into Defaults (Sync overwrites Defaults if Name matches)
+            const mergedByName = { ...defaultsByName, ...syncByName };
+
+            // 4. Convert back to Map<URL, Config> for the App state
+            const finalSites: Record<string, SiteConfig> = {};
+            Object.entries(mergedByName).forEach(([name, url]) => {
+                // We need to recover the config object. 
+                // Priority: Sync Result > Default
+                let config = uniqueSites[url];
+                if (!config) config = DEFAULT_SITES[url];
+
+                // If we still can't find it (rare edge case of mixed sources), try to find by name in defaults
+                if (!config) {
+                    const defMatch = Object.values(DEFAULT_SITES).find(c => c.name === name);
+                    if (defMatch) config = defMatch;
+                }
+
+                if (config) finalSites[url] = config;
+            });
+
+            setSites(finalSites);
+            localStorage.setItem("movie_sites_v2", JSON.stringify(finalSites));
 
             if (!isSilent) {
-                alert(`Synced! Active Config: ${Object.keys(mergedSites).length} sites.`);
+                setSyncMessage(`Synced! Active Config: ${Object.keys(finalSites).length} sites.`);
+                setTimeout(() => setSyncMessage(""), 3000);
+            } else {
+                setSyncMessage("");
             }
         } catch (e: unknown) {
-            if (!isSilent) alert("Failed to sync sites. Using offline defaults.");
+            console.error(e);
+            if (!isSilent) {
+                setSyncMessage("Failed to sync sites. Using offline defaults.");
+                setTimeout(() => setSyncMessage(""), 3000);
+            }
         } finally {
             setIsSyncing(false);
         }
@@ -115,20 +152,19 @@ export default function Home() {
         setResults([]);
         const newStatuses: Record<string, SiteStatus> = {};
 
-        const activeSites = Object.entries(sites).filter(([url, name]) => {
+        const activeSites = Object.entries(sites).filter(([url, config]) => {
             if (category === "all") return true;
-            const siteCategories = CATEGORY_MAP[name.toUpperCase()] || ["all"];
-            return siteCategories.includes(category);
+            return config.categories.includes(category);
         });
 
-        activeSites.forEach(([url, name]) => {
-            newStatuses[url] = { name, status: "loading", count: 0 };
+        activeSites.forEach(([url, config]) => {
+            newStatuses[url] = { name: config.name, status: "loading", count: 0 };
         });
         setStatuses(newStatuses);
 
-        activeSites.forEach(([url, name]) => {
+        activeSites.forEach(([url, config]) => {
             const siteUrl = url as string;
-            const siteName = name as string;
+            const siteName = config.name;
 
             fetch(`/api/search?q=${encodeURIComponent(query)}&url=${encodeURIComponent(siteUrl)}&name=${encodeURIComponent(siteName)}`)
                 .then((res) => res.json())
@@ -156,7 +192,18 @@ export default function Home() {
                         }
                     }
 
-                    setResults((prev) => [...prev, ...(data.results || [])]);
+                    // Simple Deduplication: Filter out results that have same Title AND same Site
+                    setResults((prev) => {
+                        const incoming = data.results || [];
+                        const combined = [...prev, ...incoming];
+                        // Removing duplicates based on Link is better than Title alone
+                        const unique = new Map();
+                        combined.forEach(item => {
+                            if (!unique.has(item.link)) unique.set(item.link, item);
+                        });
+                        return Array.from(unique.values());
+                    });
+
                     setStatuses((prev) => ({
                         ...prev,
                         [siteUrl]: {
@@ -183,6 +230,7 @@ export default function Home() {
                 <button className="btn" onClick={() => syncSites(false)} disabled={isSyncing}>
                     {isSyncing ? "⚡ Syncing..." : "⚡ Refresh Sites"}
                 </button>
+                {syncMessage && <span className="sync-msg">{syncMessage}</span>}
             </div>
 
             <h1>MoviesHound</h1>
@@ -265,6 +313,19 @@ export default function Home() {
                     </div>
                 </div>
             </div>
+
+            <style jsx>{`
+                .sync-msg {
+                    margin-left: 10px;
+                    font-size: 0.9rem;
+                    color: var(--text-secondary);
+                    animation: fadeIn 0.3s ease;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+            `}</style>
         </main>
     );
 }

@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import time
 
 # --- CONFIGURATION (Edit this to test new sites) ---
-TEST_SITE_URL = "https://bollyflix.sarl/"
+TEST_SITE_URL = "https://new3.hdhub4u.fo/"
 TEST_SITE_NAME = "Bollyflix"
 TEST_KEYWORD = "strange"
 # ---------------------------------------------------
