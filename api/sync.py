@@ -67,7 +67,8 @@ class handler(BaseHTTPRequestHandler):
         # --- 1. SPECIAL: Resolve Bolly4u Redirect ---
         try:
             # We follow the redirect to get the final URL
-            resp = scraper.get("https://bolly4u.cl", timeout=2.5, allow_redirects=True)
+            # TIMEOUT INCREASED: 4.0s
+            resp = scraper.get("https://bolly4u.cl", timeout=4.0, allow_redirects=True)
             if resp.status_code == 200:
                 final_b4u = resp.url
                 if not final_b4u.endswith('/'): final_b4u += '/'
@@ -79,7 +80,8 @@ class handler(BaseHTTPRequestHandler):
         for hub in HUB_SOURCES:
             try:
                 # Skip bolly4u here if we processed it above, but safe to re-check
-                response = scraper.get(hub, timeout=2.5)
+                # TIMEOUT INCREASED: 4.0s
+                response = scraper.get(hub, timeout=4.0)
                 if response.status_code != 200: continue
                 
                 soup = BeautifulSoup(response.text, 'html.parser')
