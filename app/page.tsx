@@ -14,6 +14,10 @@ const DEFAULT_SITES: Record<string, SiteConfig> = {
     "https://moviesleech.zip/": { name: "MoviesLeech", categories: ["indian"] },
     "https://rogmovies.world/": { name: "RogMovies", categories: ["indian"] },
     "https://animeflix.dad/": { name: "Animeflix", categories: ["anime"] },
+    "https://animeflix.team/": { name: "Animeflix (Watch Online)", categories: ["anime"] },
+    "https://pahe.ink/": { name: "Pahe", categories: ["international", "indian", "anime", "korean"] },
+    "https://katmoviehd.cymru/": { name: "KatMovieHD", categories: ["international"] },
+    "https://moviesbaba.net/": { name: "MoviesBaba", categories: ["indian"] },
     "https://onlykdrama.top/": { name: "OnlyKDrama", categories: ["korean"] },
     "https://mkvdrama.net/": { name: "MKVDrama", categories: ["korean"] },
     "https://bollyflix.sarl/": { name: "BollyFlix", categories: ["international", "indian"] }
